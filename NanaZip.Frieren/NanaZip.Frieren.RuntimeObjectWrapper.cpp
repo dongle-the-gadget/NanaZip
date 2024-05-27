@@ -62,6 +62,23 @@ namespace
         return CachedResult;
     }
 
+    static FARPROC GetRoTransformErrorProcAddress()
+    {
+        static FARPROC CachedResult = ([]() -> FARPROC
+        {
+            HMODULE ModuleHandle = ::GetComBaseModuleHandle();
+            if (ModuleHandle)
+            {
+                return ::GetProcAddress(
+                    ModuleHandle,
+                    "RoTransformError");
+            }
+            return nullptr;
+        }());
+
+        return CachedResult;
+    }
+
     struct ErrorInfoFallback : public winrt::implements<
         ErrorInfoFallback,
         IErrorInfo,
@@ -211,4 +228,22 @@ EXTERN_C VOID WINAPI RoFailFastWithErrorContext(
     }
 
     std::abort();
+}
+
+EXTERN_C BOOL WINAPI RoTransformError(
+    _In_ HRESULT oldError,
+    _In_ HRESULT newError,
+    _In_ HSTRING message)
+{
+    using ProcType = decltype(::RoTransformError)*;
+
+    ProcType ProcAddress = reinterpret_cast<ProcType>(
+        ::GetRoTransformErrorProcAddress());
+
+    if (ProcAddress)
+    {
+        return ProcAddress(oldError, newError, message);
+    }
+
+    return TRUE;
 }

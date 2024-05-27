@@ -231,6 +231,41 @@ LONG CMenuPage::OnApply()
   return PSNRET_NOERROR;
 }
 
+winrt::fire_and_forget LaunchSettingsAssociationAsync()
+{
+    co_await winrt::resume_background(); // Switch to a background thread.
+
+    try
+    {
+        // GetCurrentApplicationUserModelId can't work properly when the
+        // program starts from Visual Studio, because NanaZip will be
+        // allocated a wrong AUMID.
+        UINT32 nLength = 0;
+        ::GetCurrentApplicationUserModelId(
+            &nLength,
+            nullptr);
+        std::wstring AUMID(
+            nLength,
+            '\0');
+        winrt::check_hresult(::GetCurrentApplicationUserModelId(
+            &nLength,
+            AUMID.data()));
+        winrt::Uri NavigateURI(
+            L"ms-settings:defaultapps?registeredAUMID="
+            + AUMID);
+        winrt::LauncherOptions Options;
+        Options.TargetApplicationPackageFamilyName(
+            L"windows.immersivecontrolpanel_cw5n1h2txyewy");
+        co_await winrt::Launcher::LaunchUriAsync(
+            NavigateURI,
+            Options);
+    }
+    catch (...)
+    {
+        // Forget the error.
+    }
+}
+
 bool CMenuPage::OnButtonClicked(int buttonID, HWND buttonHWND)
 {
   switch (buttonID)
@@ -240,36 +275,8 @@ bool CMenuPage::OnButtonClicked(int buttonID, HWND buttonHWND)
 
     case IDB_SYSTEM_ASSOCIATE:
     {
-        try
-        {
-            // GetCurrentApplicationUserModelId can't work properly when the
-            // program starts from Visual Studio, because NanaZip will be
-            // allocated a wrong AUMID.
-            UINT32 nLength = 0;
-            ::GetCurrentApplicationUserModelId(
-                &nLength,
-                nullptr);
-            std::wstring AUMID(
-                nLength,
-                '\0');
-            winrt::check_hresult(::GetCurrentApplicationUserModelId(
-                &nLength,
-                AUMID.data()));
-            winrt::Uri NavigateURI(
-                L"ms-settings:defaultapps?registeredAUMID="
-                + AUMID);
-            winrt::LauncherOptions Options;
-            Options.TargetApplicationPackageFamilyName(
-                L"windows.immersivecontrolpanel_cw5n1h2txyewy");
-            winrt::Launcher::LaunchUriAsync(
-                NavigateURI,
-                Options).get();
-            return true;
-        }
-        catch (...)
-        {
-            return false;
-        }
+        LaunchSettingsAssociationAsync();
+        return true;
     }
 
     default:

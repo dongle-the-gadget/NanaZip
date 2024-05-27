@@ -9,6 +9,7 @@
 
 namespace winrt
 {
+    using Windows::Foundation::IAsyncOperation;
     using Windows::Foundation::IInspectable;
     using Windows::Services::Store::StoreContext;
     using Windows::System::DispatcherQueue;
@@ -83,9 +84,9 @@ namespace winrt::NanaZip::Modern::implementation
         winrt::DispatcherQueue m_DispatcherQueue = nullptr;
         winrt::StoreContext m_StoreContext = nullptr;
 
-        bool CheckSponsorEditionLicense();
+        winrt::IAsyncOperation<bool> CheckSponsorEditionLicenseAsync();
 
-        void RefreshSponsorButtonContent();
+        winrt::fire_and_forget RefreshSponsorButtonContentAsync();
     };
 }
 

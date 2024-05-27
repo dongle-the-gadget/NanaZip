@@ -158,7 +158,7 @@ namespace winrt::NanaZip::Modern::implementation
         UNREFERENCED_PARAMETER(sender);
         UNREFERENCED_PARAMETER(e);
 
-        this->RefreshSponsorButtonContent();
+        this->RefreshSponsorButtonContentAsync();
     }
 
     void MainWindowToolBarPage::AddButtonClick(
@@ -490,11 +490,11 @@ namespace winrt::NanaZip::Modern::implementation
                 L"Software\\NanaZip",
                 L"SponsorEdition");
 
-            this->RefreshSponsorButtonContent();
+            this->RefreshSponsorButtonContentAsync();
         }));
     }
 
-    bool MainWindowToolBarPage::CheckSponsorEditionLicense()
+    IAsyncOperation<bool> MainWindowToolBarPage::CheckSponsorEditionLicenseAsync()
     {
         {
             DWORD Data = 0;
@@ -508,7 +508,7 @@ namespace winrt::NanaZip::Modern::implementation
                 &Data,
                 &Length))
             {
-                return Data;
+                co_return Data;
             }
         }
 
@@ -517,9 +517,9 @@ namespace winrt::NanaZip::Modern::implementation
         if (this->m_StoreContext)
         {
             winrt::StoreProductQueryResult ProductQueryResult =
-                this->m_StoreContext.GetStoreProductsAsync(
+                co_await this->m_StoreContext.GetStoreProductsAsync(
                     { L"Durable" },
-                    { L"9N9DNPT6D6Z9" }).get();
+                    { L"9N9DNPT6D6Z9" });
             for (auto Item : ProductQueryResult.Products())
             {
                 winrt::StoreProduct Product = Item.Value();
@@ -538,29 +538,25 @@ namespace winrt::NanaZip::Modern::implementation
                 sizeof(DWORD));
         }
 
-        return Sponsored;
+        co_return Sponsored;
     }
 
-    void MainWindowToolBarPage::RefreshSponsorButtonContent()
+    winrt::fire_and_forget MainWindowToolBarPage::RefreshSponsorButtonContentAsync()
     {
-        winrt::handle(Mile::CreateThread([=]()
-        {
-            bool Sponsored = this->CheckSponsorEditionLicense();
+        co_await winrt::resume_background(); // Switch to a background thread.
 
-            if (!this->m_DispatcherQueue)
-            {
-                return;
-            }
-            this->m_DispatcherQueue.TryEnqueue(
-                winrt::DispatcherQueuePriority::Normal,
-                [=]()
-            {
-                this->SponsorButton().Content(
-                    winrt::box_value(Mile::WinRT::GetLocalizedString(
-                        Sponsored
-                        ? L"MainWindowToolBarPage/SponsorButton/SponsoredText"
-                        : L"MainWindowToolBarPage/SponsorButton/AcquireText")));
-            });
-        }));
+        bool Sponsored = co_await this->CheckSponsorEditionLicenseAsync();
+        winrt::IInspectable boxed_text = winrt::box_value(Mile::WinRT::GetLocalizedString(
+            Sponsored
+            ? L"MainWindowToolBarPage/SponsorButton/SponsoredText"
+            : L"MainWindowToolBarPage/SponsorButton/AcquireText"));
+
+        if (!this->m_DispatcherQueue)
+        {
+            co_return;
+        }
+
+        co_await winrt::resume_foreground(m_DispatcherQueue); // Switch back to the UI thread.
+        this->SponsorButton().Content(boxed_text);
     }
 }
